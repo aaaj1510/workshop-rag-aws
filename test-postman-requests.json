@@ -1,0 +1,75 @@
+{
+  "info": {
+    "name": "Workshop RAG - Pruebas Lambda",
+    "description": "Colección de pruebas para las Lambda Functions del workshop RAG"
+  },
+  "item": [
+    {
+      "name": "1. Test Query Handler - Consulta Simple",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"query\": \"¿Cuántos días de vacaciones tengo?\"\n}"
+        },
+        "url": {
+          "raw": "{{QUERY_FUNCTION_URL}}",
+          "host": ["{{QUERY_FUNCTION_URL}}"]
+        }
+      }
+    },
+    {
+      "name": "2. Test Query Handler - Beneficios",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"query\": \"¿Qué beneficios médicos ofrece la empresa?\"\n}"
+        },
+        "url": {
+          "raw": "{{QUERY_FUNCTION_URL}}",
+          "host": ["{{QUERY_FUNCTION_URL}}"]
+        }
+      }
+    },
+    {
+      "name": "3. Test Query Handler - Trabajo Remoto",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"query\": \"¿Puedo trabajar desde casa?\"\n}"
+        },
+        "url": {
+          "raw": "{{QUERY_FUNCTION_URL}}",
+          "host": ["{{QUERY_FUNCTION_URL}}"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "QUERY_FUNCTION_URL",
+      "value": "https://XXXXXXXXXX.lambda-url.us-east-1.on.aws/",
+      "description": "URL de la Lambda Function para queries - obtener de CloudFormation Outputs"
+    }
+  ]
+}

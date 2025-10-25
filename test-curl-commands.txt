@@ -1,0 +1,25 @@
+# COMANDOS CURL PARA PROBAR LAS LAMBDA FUNCTIONS
+# Reemplazar {QUERY_FUNCTION_URL} con la URL real de CloudFormation Outputs
+
+# 1. Probar consulta sobre vacaciones
+curl -X POST {QUERY_FUNCTION_URL} \
+  -H "Content-Type: application/json" \
+  -d '{"query": "¿Cuántos días de vacaciones tengo?"}'
+
+# 2. Probar consulta sobre beneficios
+curl -X POST {QUERY_FUNCTION_URL} \
+  -H "Content-Type: application/json" \
+  -d '{"query": "¿Qué beneficios médicos ofrece la empresa?"}'
+
+# 3. Probar consulta sobre trabajo remoto
+curl -X POST {QUERY_FUNCTION_URL} \
+  -H "Content-Type: application/json" \
+  -d '{"query": "¿Puedo trabajar desde casa?"}'
+
+# 4. Probar consulta sobre horarios
+curl -X POST {QUERY_FUNCTION_URL} \
+  -H "Content-Type: application/json" \
+  -d '{"query": "¿Cuál es el horario de trabajo?"}'
+
+# NOTA: Para probar el document processor, necesitas subir un archivo a S3
+# El processor se ejecuta automáticamente cuando subes un archivo .txt al bucket

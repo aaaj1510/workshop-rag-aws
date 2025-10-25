@@ -1,0 +1,274 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'RAG Workshop - Infraestructura base (S3, DynamoDB, IAM)'
+
+Parameters:
+  WorkshopName:
+    Type: String
+    Default: 'rag-workshop'
+    Description: 'Nombre base para los recursos del workshop'
+    AllowedPattern: '^[a-zA-Z0-9-]+$'
+    ConstraintDescription: 'Solo letras, números y guiones'
+  
+  StudentName:
+    Type: String
+    Description: 'Nombre único del estudiante (ej: juan-perez, maria-garcia)'
+    AllowedPattern: '^[a-z0-9-]+$'
+    ConstraintDescription: 'Solo letras minúsculas, números y guiones. Ejemplo: juan-perez'
+    MinLength: 3
+    MaxLength: 20
+
+Resources:
+  # S3 Bucket para almacenar documentos
+  DocumentsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${WorkshopName}-${StudentName}-docs-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      NotificationConfiguration:
+        LambdaConfigurations: []  # Se configurará manualmente
+      Tags:
+        - Key: Workshop
+          Value: RAG-Bedrock
+        - Key: Purpose
+          Value: DocumentStorage
+        - Key: Student
+          Value: !Ref StudentName
+
+  # DynamoDB Table para almacenar vectores y chunks
+  VectorTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${WorkshopName}-${StudentName}-vectors'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: document_id
+          AttributeType: S
+        - AttributeName: chunk_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: document_id
+          KeyType: HASH
+        - AttributeName: chunk_id
+          KeyType: RANGE
+      Tags:
+        - Key: Workshop
+          Value: RAG-Bedrock
+        - Key: Purpose
+          Value: VectorStorage
+        - Key: Student
+          Value: !Ref StudentName
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  # IAM Role para las funciones Lambda
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    DependsOn: 
+      - DocumentsBucket
+      - VectorTable
+    Properties:
+      RoleName: !Sub '${WorkshopName}-${StudentName}-lambda-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: WorkshopLambdaPermissions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Permisos para S3
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource: !Sub 'arn:aws:s3:::${DocumentsBucket}/*'
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !Sub 'arn:aws:s3:::${DocumentsBucket}'
+              
+              # Permisos para DynamoDB
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:BatchGetItem
+                  - dynamodb:BatchWriteItem
+                Resource: !GetAtt VectorTable.Arn
+              
+              # Permisos para Bedrock
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:ListFoundationModels
+                Resource: '*'
+              
+              # Permisos para CloudWatch Logs (adicionales)
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*'
+      Tags:
+        - Key: Workshop
+          Value: RAG-Bedrock
+        - Key: Purpose
+          Value: LambdaExecution
+
+  # CloudWatch Log Group para funciones Lambda (opcional pero recomendado)
+  ProcessorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${WorkshopName}-${StudentName}-document-processor'
+      RetentionInDays: 7
+
+  QueryLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${WorkshopName}-${StudentName}-query-handler'
+      RetentionInDays: 7
+
+  # Lambda Function - Document Processor
+  DocumentProcessorFunction:
+    Type: AWS::Lambda::Function
+    DependsOn:
+      - LambdaExecutionRole
+      - ProcessorLogGroup
+    Properties:
+      FunctionName: !Sub '${WorkshopName}-${StudentName}-document-processor'
+      Runtime: python3.11
+      Handler: lambda_function.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 300
+      MemorySize: 512
+      Environment:
+        Variables:
+          VECTOR_TABLE: !Ref VectorTable
+          DOCUMENTS_BUCKET: !Ref DocumentsBucket
+      Code:
+        ZipFile: |
+          import json
+          def lambda_handler(event, context):
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps('Document processor placeholder - deploy real code')
+              }
+      Tags:
+        - Key: Workshop
+          Value: RAG-Bedrock
+        - Key: Purpose
+          Value: DocumentProcessor
+
+  # Lambda Function - Query Handler
+  QueryHandlerFunction:
+    Type: AWS::Lambda::Function
+    DependsOn:
+      - LambdaExecutionRole
+      - QueryLogGroup
+    Properties:
+      FunctionName: !Sub '${WorkshopName}-${StudentName}-query-handler'
+      Runtime: python3.11
+      Handler: lambda_function.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 300
+      MemorySize: 512
+      Environment:
+        Variables:
+          VECTOR_TABLE: !Ref VectorTable
+      Code:
+        ZipFile: |
+          import json
+          def lambda_handler(event, context):
+              return {
+                  'statusCode': 200,
+                  'headers': {
+                      'Content-Type': 'application/json',
+                      'Access-Control-Allow-Origin': '*'
+                  },
+                  'body': json.dumps({'message': 'Query handler placeholder - deploy real code'})
+              }
+      Tags:
+        - Key: Workshop
+          Value: RAG-Bedrock
+        - Key: Purpose
+          Value: QueryHandler
+
+Outputs:
+  DocumentsBucket:
+    Description: 'Nombre del bucket S3 para documentos'
+    Value: !Ref DocumentsBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-DocumentsBucket'
+  
+  DocumentsBucketArn:
+    Description: 'ARN del bucket S3'
+    Value: !GetAtt DocumentsBucket.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-DocumentsBucketArn'
+  
+  VectorTable:
+    Description: 'Nombre de la tabla DynamoDB para vectores'
+    Value: !Ref VectorTable
+    Export:
+      Name: !Sub '${AWS::StackName}-VectorTable'
+  
+  VectorTableArn:
+    Description: 'ARN de la tabla DynamoDB'
+    Value: !GetAtt VectorTable.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-VectorTableArn'
+  
+  LambdaExecutionRole:
+    Description: 'ARN del rol IAM para Lambda'
+    Value: !GetAtt LambdaExecutionRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaRole'
+  
+  LambdaRoleName:
+    Description: 'Nombre del rol IAM para Lambda'
+    Value: !Ref LambdaExecutionRole
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaRoleName'
+
+  # Información útil para el workshop
+  Region:
+    Description: 'Región AWS donde se desplegaron los recursos'
+    Value: !Ref 'AWS::Region'
+  
+  AccountId:
+    Description: 'ID de la cuenta AWS'
+    Value: !Ref 'AWS::AccountId'
+  
+  StackName:
+    Description: 'Nombre del stack CloudFormation'
+    Value: !Ref 'AWS::StackName'
+  
+  DocumentProcessorFunction:
+    Description: 'ARN de la función Lambda procesadora de documentos'
+    Value: !GetAtt DocumentProcessorFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-DocumentProcessor'
+  
+  QueryHandlerFunction:
+    Description: 'ARN de la función Lambda manejadora de consultas'
+    Value: !GetAtt QueryHandlerFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-QueryHandler'

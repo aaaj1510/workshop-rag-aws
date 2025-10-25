@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS User Group Panama - RAG Workshop</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Amazon Ember', 'Helvetica Neue', Roboto, Arial, sans-serif;
+            background: linear-gradient(135deg, #232F3E 0%, #FF9900 100%);
+            min-height: 100vh;
+            padding: 20px;
+            margin: 0;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.15), 0 10px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #232F3E 0%, #1a252f 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="1" fill="%23ffffff" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>') repeat;
+            opacity: 0.1;
+        }
+        
+        .header > * {
+            position: relative;
+            z-index: 1;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+            min-height: 600px;
+        }
+        
+        .upload-section {
+            padding: 40px;
+            background: #f8f9fa;
+            border-right: 1px solid #e9ecef;
+        }
+        
+        .chat-section {
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .section-title {
+            font-size: 1.6em;
+            margin-bottom: 25px;
+            color: #232F3E;
+            border-bottom: 3px solid #FF9900;
+            padding-bottom: 12px;
+            font-weight: 700;
+            position: relative;
+        }
+        
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: -3px;
+            left: 0;
+            width: 50px;
+            height: 3px;
+            background: #232F3E;
+        }
+        
+        .upload-area {
+            border: 3px dashed #FF9900;
+            border-radius: 15px;
+            padding: 50px;
+            text-align: center;
+            background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .upload-area::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,153,0,0.1) 0%, transparent 70%);
+            transform: scale(0);
+            transition: transform 0.6s ease;
+        }
+        
+        .upload-area:hover::before {
+            transform: scale(1);
+        }
+        
+        .upload-area:hover {
+            border-color: #232F3E;
+            background: linear-gradient(145deg, #f0f8ff 0%, #e8f4fd 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 15px 30px rgba(255,153,0,0.2);
+        }
+        
+        .upload-area.dragover {
+            border-color: #27ae60;
+            background: #f0fff0;
+        }
+        
+        .upload-icon {
+            font-size: 3em;
+            color: #3498db;
+            margin-bottom: 20px;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .upload-btn {
+            background: linear-gradient(135deg, #FF9900 0%, #FF7700 100%);
+            color: white;
+            border: none;
+            padding: 15px 35px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 15px rgba(255,153,0,0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .upload-btn:hover {
+            background: linear-gradient(135deg, #232F3E 0%, #1a252f 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(35,47,62,0.4);
+        }
+        
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .messages {
+            flex: 1;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            overflow-y: auto;
+            max-height: 400px;
+            background: #f8f9fa;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            padding: 15px;
+            border-radius: 10px;
+            max-width: 80%;
+        }
+        
+        .message.user {
+            background: linear-gradient(135deg, #FF9900 0%, #FF7700 100%);
+            color: white;
+            margin-left: auto;
+            box-shadow: 0 4px 15px rgba(255,153,0,0.2);
+        }
+        
+        .message.assistant {
+            background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%);
+            border: 1px solid #e9ecef;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        
+        .input-container {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .query-input {
+            flex: 1;
+            padding: 15px;
+            border: 1px solid #e9ecef;
+            border-radius: 25px;
+            font-size: 1em;
+            outline: none;
+        }
+        
+        .query-input:focus {
+            border-color: #3498db;
+        }
+        
+        .send-btn {
+            background: linear-gradient(135deg, #FF9900 0%, #FF7700 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 15px rgba(255,153,0,0.3);
+        }
+        
+        .send-btn:hover {
+            background: linear-gradient(135deg, #232F3E 0%, #1a252f 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(35,47,62,0.4);
+        }
+        
+        .send-btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+        
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            text-align: center;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .upload-section {
+                border-right: none;
+                border-bottom: 1px solid #e9ecef;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+                <div style="background: #FF9900; padding: 8px 16px; border-radius: 8px; margin-right: 15px; font-weight: bold; font-size: 0.9em;">AWS</div>
+                <h1 style="font-size: 2.2em; margin: 0; font-weight: 300; letter-spacing: 1px;">USER GROUP PANAMA</h1>
+            </div>
+            <div style="height: 2px; width: 100px; background: #FF9900; margin: 0 auto 20px;"></div>
+            <h2 style="font-size: 2em; margin-bottom: 15px; font-weight: 600;">🚀 RAG Workshop</h2>
+            <p style="font-size: 1.3em; opacity: 0.9; font-weight: 300;">Pregúntale a tus Documentos con IA Conversacional</p>
+            <div style="margin-top: 20px; font-size: 0.9em; opacity: 0.7;">
+                Powered by Amazon Bedrock • AWS Lambda • DynamoDB
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="upload-section">
+                <h2 class="section-title">📄 Subir Documento</h2>
+                
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📁</div>
+                    <p><strong>Arrastra tu PDF o TXT aquí</strong></p>
+                    <p>o</p>
+                    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                        Seleccionar Archivo
+                    </button>
+                    <input type="file" id="fileInput" class="file-input" accept=".pdf,.txt">
+                </div>
+                
+                <div id="uploadStatus"></div>
+                
+                <div style="margin-top: 30px;">
+                    <h3>📋 Documentos de Prueba</h3>
+                    <p style="margin-top: 10px; color: #666;">
+                        Sube un PDF o TXT con políticas empresariales, manuales técnicos, 
+                        o cualquier documento que quieras consultar.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="chat-section">
+                <h2 class="section-title">💬 Chat con tus Documentos</h2>
+                
+                <div class="chat-container">
+                    <div class="messages" id="messages">
+                        <div class="message assistant">
+                            ¡Hola! Sube un documento PDF o TXT y luego podrás hacerme preguntas sobre su contenido. 
+                            Estoy aquí para ayudarte a encontrar información específica de manera conversacional.
+                        </div>
+                    </div>
+                    
+                    <div class="input-container">
+                        <input 
+                            type="text" 
+                            id="queryInput" 
+                            class="query-input" 
+                            placeholder="Escribe tu pregunta aquí..."
+                            disabled
+                        >
+                        <button id="sendBtn" class="send-btn" disabled>Enviar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>

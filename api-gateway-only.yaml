@@ -1,0 +1,145 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'RAG Workshop - Solo API Gateway para conectar con Lambda existente'
+
+Parameters:
+  WorkshopName:
+    Type: String
+    Default: 'rag-workshop'
+    Description: 'Nombre base para los recursos del workshop'
+    AllowedPattern: '^[a-zA-Z0-9-]+$'
+    ConstraintDescription: 'Solo letras, números y guiones'
+  
+  StudentName:
+    Type: String
+    Description: 'Nombre único del estudiante (MISMO que usaste en infrastructure-base.yaml)'
+    AllowedPattern: '^[a-z0-9-]+$'
+    ConstraintDescription: 'Solo letras minúsculas, números y guiones. Ejemplo: juan-perez'
+    MinLength: 3
+    MaxLength: 20
+  
+  BaseStackName:
+    Type: String
+    Description: 'Nombre del stack base que creaste antes (ej: rag-workshop-base-juan-perez)'
+    MinLength: 5
+    MaxLength: 50
+
+Resources:
+  # API Gateway REST API
+  RagApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub 'rag-workshop-${StudentName}-api'
+      Description: 'API para RAG Workshop'
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  # API Gateway Resource /query
+  QueryResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RagApi
+      ParentId: !GetAtt RagApi.RootResourceId
+      PathPart: query
+
+  # API Gateway Method POST /query
+  QueryMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RagApi
+      ResourceId: !Ref QueryResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${WorkshopName}-${StudentName}-query-handler/invocations'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: false
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+
+  # API Gateway Method OPTIONS /query (para CORS)
+  QueryOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RagApi
+      ResourceId: !Ref QueryResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: false
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+
+  # Lambda Permission para API Gateway
+  LambdaApiGatewayPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Sub '${WorkshopName}-${StudentName}-query-handler'
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RagApi}/*/*'
+
+  # API Gateway Deployment
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - QueryMethod
+      - QueryOptionsMethod
+    Properties:
+      RestApiId: !Ref RagApi
+      StageName: prod
+      StageDescription:
+        Description: 'Production stage for RAG API'
+
+Outputs:
+  # API Gateway
+  ApiGatewayUrl:
+    Description: 'URL base del API Gateway'
+    Value: !Sub 'https://${RagApi}.execute-api.${AWS::Region}.amazonaws.com/prod'
+  
+  QueryEndpoint:
+    Description: 'Endpoint completo para consultas RAG'
+    Value: !Sub 'https://${RagApi}.execute-api.${AWS::Region}.amazonaws.com/prod/query'
+
+  # Información para Postman
+  PostmanTestUrl:
+    Description: 'URL para probar en Postman'
+    Value: !Sub 'https://${RagApi}.execute-api.${AWS::Region}.amazonaws.com/prod/query'
+  
+  PostmanTestBody:
+    Description: 'JSON body para Postman'
+    Value: '{"query": "¿Cuántos días de vacaciones tengo?"}'
+  
+  # Información para conectar con infraestructura existente
+  ExistingQueryHandlerFunction:
+    Description: 'Nombre de la función Lambda query handler existente'
+    Value: !Sub '${WorkshopName}-${StudentName}-query-handler'
+  
+  ExistingVectorTable:
+    Description: 'Nombre de la tabla DynamoDB existente'
+    Value: !Sub '${WorkshopName}-${StudentName}-vectors'
+  
+  ExistingDocumentsBucket:
+    Description: 'Nombre del bucket S3 existente'
+    Value: !Sub '${WorkshopName}-${StudentName}-docs-${AWS::AccountId}'
+  
+  # Instrucciones para el estudiante
+  NextSteps:
+    Description: 'Próximos pasos después del despliegue'
+    Value: '1. Actualizar código Lambda query-handler, 2. Probar en Postman, 3. Conectar frontend'
